@@ -9,6 +9,8 @@ class PageSelector:
     def __init__(self, driver, wait):
         self.driver = driver
         self.wait = wait
+        self.unfinished_chapters = []
+        self.current_chapter_index = 0
 
     def find_all_tasks(self):
         """
@@ -167,4 +169,110 @@ class PageSelector:
         打开指定的课程页面
         """
         self.driver.get(url)
-        logging.info("已打开课程页面") 
+        logging.info("已打开课程页面")
+
+    def get_all_unfinished_chapters(self):
+        """
+        获取所有未完成章节的列表
+        """
+        logging.info("开始获取所有未完成的章节...")
+        unfinished_chapters = []
+        try:
+            self.driver.switch_to.frame("frame_content-zj")
+            
+            self.wait.until(
+                EC.presence_of_element_located((By.CLASS_NAME, "chapter_item"))
+            )
+            
+            chapters = self.driver.find_elements(By.CLASS_NAME, "chapter_item")
+            for chapter in chapters:
+                try:
+                    onclick = chapter.get_attribute("onclick")
+                    if not onclick:
+                        continue
+                    task_points = chapter.find_elements(By.CLASS_NAME, "icon_yiwanc")
+                    if not task_points:
+                        title = chapter.get_attribute("title")
+                        unfinished_chapters.append({
+                            'element': chapter,
+                            'title': title,
+                            'onclick': onclick
+                        })
+                        logging.info(f"添加未完成章节: {title}")
+                except Exception as e:
+                    logging.debug(f"处理章节时出错: {str(e)}")
+                    continue
+            
+            logging.info(f"共找到 {len(unfinished_chapters)} 个未完成章节")
+            return unfinished_chapters
+            
+        except Exception as e:
+            logging.error(f"获取未完成章节列表时出错: {str(e)}")
+            return []
+        finally:
+            self.driver.switch_to.default_content()
+
+    def initialize_unfinished_chapters(self):
+        """
+        初始化未完成章节列表
+        """
+        self.unfinished_chapters = self.get_all_unfinished_chapters()
+        self.current_chapter_index = 0
+        return len(self.unfinished_chapters) > 0
+
+    def click_next_unfinished_chapter(self):
+        """
+        点击下一个未完成的章节
+        """
+        if not self.unfinished_chapters:
+            logging.info("没有未完成的章节")
+            return False
+
+        if self.current_chapter_index >= len(self.unfinished_chapters):
+            logging.info("所有未完成章节都已尝试")
+            return False
+
+        try:
+            chapter_info = self.unfinished_chapters[self.current_chapter_index]
+            logging.info(f"尝试点击第 {self.current_chapter_index + 1} 个未完成章节: {chapter_info['title']}")
+            
+            # 切换到章节列表的iframe
+            self.driver.switch_to.frame("frame_content-zj")
+            
+            # 等待章节列表加载
+            self.wait.until(
+                EC.presence_of_element_located((By.CLASS_NAME, "chapter_item"))
+            )
+            
+            # 重新获取所有章节元素
+            chapters = self.driver.find_elements(By.CLASS_NAME, "chapter_item")
+            target_chapter = None
+            
+            # 通过标题和onclick属性匹配目标章节
+            for chapter in chapters:
+                try:
+                    title = chapter.get_attribute("title")
+                    onclick = chapter.get_attribute("onclick")
+                    if title == chapter_info['title'] and onclick == chapter_info['onclick']:
+                        target_chapter = chapter
+                        break
+                except Exception:
+                    continue
+            
+            if target_chapter is None:
+                logging.error(f"无法找到章节: {chapter_info['title']}")
+                self.current_chapter_index += 1
+                return self.click_next_unfinished_chapter()
+            
+            # 点击找到的章节
+            target_chapter.click()
+            self.current_chapter_index += 1
+            logging.info(f"已点击章节: {chapter_info['title']}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"点击章节时出错: {str(e)}")
+            self.current_chapter_index += 1  # 跳过当前出错的章节
+            return self.click_next_unfinished_chapter()  # 递归尝试下一个章节
+        finally:
+            self.driver.switch_to.default_content() 

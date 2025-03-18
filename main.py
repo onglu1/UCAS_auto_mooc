@@ -56,10 +56,15 @@ class MoocAutomation:
                 course_url = config_data.get('course_url')
             self.page_selector.open_course_page(course_url)
 
+            # 初始化未完成章节列表
+            if not self.page_selector.initialize_unfinished_chapters():
+                logging.info("没有找到任何未完成的章节")
+                return
+
             while True:
-                # 查找并点击未完成的章节
-                if not self.page_selector.click_unfinished_chapter():
-                    logging.info("所有章节已完成或无法找到未完成章节")
+                # 尝试点击下一个未完成的章节
+                if not self.page_selector.click_next_unfinished_chapter():
+                    logging.info("所有章节已处理完毕")
                     break
 
                 # 等待页面加载
