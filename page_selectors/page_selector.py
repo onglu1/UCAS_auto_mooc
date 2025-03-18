@@ -28,6 +28,9 @@ class PageSelector:
             logging.info(f"找到 {len(tasks)} 个任务点")
             all_tasks = []
             
+            pdf_index = 0
+            video_index = 0
+
             for i, task in enumerate(tasks, 1):
                 try:
                     parent = task.find_element(By.XPATH, "./..")
@@ -41,10 +44,12 @@ class PageSelector:
                     task_xpath = ""
                     if "insertdoc-online-pdf" in iframe_class:
                         task_type = "pdf"
-                        task_xpath = f"//iframe[contains(@class, 'insertdoc-online-pdf')]"
+                        pdf_index += 1
+                        task_xpath = f"(//iframe[contains(@class, 'insertdoc-online-pdf')])[{pdf_index}]"
                     elif "ans-insertvideo-online" in iframe_class:
                         task_type = "video"
-                        task_xpath = f"//iframe[contains(@class, 'ans-insertvideo-online')]"
+                        video_index += 1
+                        task_xpath = f"(//iframe[contains(@class, 'ans-insertvideo-online')])[{video_index}]"
                     
                     task_info = {
                         "type": task_type,
